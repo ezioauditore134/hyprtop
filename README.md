@@ -4,7 +4,7 @@ A terminal process viewer for [Hyprland](https://hyprland.org) that shows only t
 
 Each program's CPU and memory are summed over its whole process tree, so a terminal window also counts the shell and whatever runs inside it, and a browser counts all of its content processes.
 
-The interface is in Italian.
+The interface is in English and Italian. It starts in the system language (Italian when `LC_ALL`, `LC_MESSAGES` or `LANG` starts with `it`, English otherwise), and `L` switches between the two.
 
 ## Requirements
 
@@ -26,7 +26,7 @@ hyprtop is a single file with no other dependencies, so copying `hyprtop.py` any
 
 ```
 hyprtop            # interactive, refreshes every 2 s
-hyprtop -i 5       # refresh every 5 s
+hyprtop -i 5       # refresh every 5 s (same as --interval 5)
 hyprtop --once     # print one snapshot as plain text and exit
 ```
 
@@ -54,12 +54,13 @@ Press `v` to switch to the list view: one box with a line per program and a sepa
 | o | sort programs by CPU, memory or name |
 | v | card view or list view |
 | z | card view: center the last row when it is not full |
+| L | switch between English and Italian |
 | + - | refresh faster or slower (0.5 to 30 s) |
 | r | refresh now |
 | ? | help |
 | q, Esc | quit |
 
-Confirmation prompts accept `s` (Italian for yes) or `y`.
+Confirmation prompts accept `y`, and `s` (Italian for yes) in either language.
 
 `c` asks the program to close one window, so it can still ask to save your work. `t` asks the whole program to quit, which closes all of its windows, including those on other workspaces. `K` stops it immediately and should only be needed for a program that is stuck.
 
@@ -81,7 +82,7 @@ hyprtop reads the color theme configured for btop (`color_theme` in `~/.config/b
 
 ## Saved settings
 
-The `z` choice is kept between runs in `~/.local/state/hyprtop/stato.json` (or under `$XDG_STATE_HOME`). Deleting the file restores the defaults.
+The `z` and `L` choices are kept between runs in `~/.local/state/hyprtop/stato.json` (or under `$XDG_STATE_HOME`). Deleting the file restores the defaults.
 
 ## Tests
 
@@ -90,6 +91,10 @@ python3 -m unittest -v test_hyprtop
 ```
 
 The two tests in `LiveTest` run only inside Hyprland: one prints a snapshot, the other drives the interface in a pseudo-terminal using only keys that don't touch windows or processes.
+
+## Releases
+
+Pushing a tag such as `v0.2.0` runs `.github/workflows/release.yml`, which creates the GitHub release with the notes from the matching `## v0.2.0` section of `CHANGELOG.md`. The workflow fails if that section is missing.
 
 ## License
 

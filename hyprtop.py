@@ -22,11 +22,166 @@ from dataclasses import dataclass, field
 
 import psutil
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 NCPU = psutil.cpu_count() or 1
 SORTS = ("cpu", "ram", "nome")
 MAX_PROCS = 12  # righe di processi figli mostrate quando una riga è espansa
+
+
+# --- lingua ----------------------------------------------------------------
+
+LANGS = ("en", "it")
+LANG_NOW = "en"
+
+STRINGS = {
+    "en": {
+        "description": "Programs with a window, grouped by Hyprland workspace.",
+        "help_interval": "refresh interval in seconds (default 2)",
+        "help_once": "print one snapshot and exit",
+        "metavar_seconds": "SECONDS",
+        "no_hyprland": "hyprtop: HYPRLAND_INSTANCE_SIGNATURE is not set, run it inside Hyprland",
+        "unexpected": "unexpected reply ({kind})",
+        "save_failed": "cannot save the setting to {path}: {err}",
+        "win_1": "1 window", "win_n": "{n} windows",
+        "active": "active", "total": "Window total: CPU {cpu:.1f}%  RAM {mem}",
+        "every": "every ", "sort": "sort ", "view": "view ", "centered": " centered",
+        "sort_cpu": "cpu", "sort_ram": "mem", "sort_nome": "name",
+        "view_schede": "cards", "view_lista": "list",
+        "top_windows": "windows", "col_program": "program", "col_window": "window",
+        "box_windows": "windows", "more": "… {n} more processes",
+        "error": "Error: {e}", "empty": "No windows open.", "too_small": "hyprtop: terminal too small",
+        "no_ws": "No windows on workspace {n}", "go": "Going to {cls} on {ws}",
+        "close_q": "Close the window \"{title}\" of {cls}?", "cancelled": "Cancelled",
+        "win_gone": "The window is gone, nothing closed",
+        "close_sent": "Asked \"{title}\" to close",
+        "verb_term": "Terminate", "verb_kill": "Kill (SIGKILL)",
+        "note_shared": "it has windows on other workspaces too",
+        "note_here": "it is hyprtop's own terminal", "warning": "Warning: {notes}. ",
+        "proc_missing": "{cls}: process not found",
+        "signal_q": "{note}{verb} {cls} (pid {pid}, {n} processes)?",
+        "signal_gone": "{cls} (pid {pid}) is gone, no signal sent",
+        "signal_sent": "Sent {sig} to {cls} (pid {pid})",
+        "yes_no": "[y/N]", "lang_set": "Language: English",
+        "hints": (("↑↓", "select"), ("⏎", "go"), ("e", "processes"), ("c", "close"),
+                  ("t", "terminate"), ("K", "kill"), ("o", "sort"), ("v", "view"),
+                  ("z", "center"), ("L", "italiano"), ("+-", "interval"),
+                  ("?", "help"), ("q", "quit")),
+        "help": """\
+ hyprtop: programs with a window, by workspace
+
+ ↑ ↓  j k      select a program
+ ← →  h l      card to the left / right (card view)
+ PgUp PgDn     one page (card view: the row above / below)
+ v             card view or list view
+ z             last row of cards centered or left-aligned
+ L             switch language (English / Italian)
+ Tab  1-9      next workspace / workspace N
+ Enter         focus the window (switches workspace)
+ e  Space      show or hide the program's processes
+ c             close the window (like its close button)
+ t             terminate the program (SIGTERM)
+ K             kill the program (SIGKILL)
+ o             sort: CPU, memory, name
+ + -           refresh faster / slower
+ r             refresh now
+ q  Esc        quit
+
+ CPU as % of the whole machine ({ncpu} cores), summed over child processes.
+ Memory = PSS summed over child processes (shared memory is split among
+ the processes using it), reread every 10 s; RSS at first and for new processes.
+ ◆ = the terminal hyprtop runs in
+ ↔ = same process with windows on several workspaces (counted once in totals)
+ ×N = N windows of that program on the workspace
+
+ Press any key to go back.""",
+    },
+    "it": {
+        "description": "Programmi con finestra, raggruppati per workspace di Hyprland.",
+        "help_interval": "ogni quanti secondi aggiornare (default 2)",
+        "help_once": "stampa una volta ed esce",
+        "metavar_seconds": "SECONDI",
+        "no_hyprland": "hyprtop: HYPRLAND_INSTANCE_SIGNATURE non c'è, va lanciato dentro Hyprland",
+        "unexpected": "risposta inattesa ({kind})",
+        "save_failed": "non riesco a salvare la scelta in {path}: {err}",
+        "win_1": "1 finestra", "win_n": "{n} finestre",
+        "active": "attivo", "total": "Totale finestre: CPU {cpu:.1f}%  RAM {mem}",
+        "every": "ogni ", "sort": "ordine ", "view": "vista ", "centered": " centrate",
+        "sort_cpu": "cpu", "sort_ram": "ram", "sort_nome": "nome",
+        "view_schede": "schede", "view_lista": "lista",
+        "top_windows": "finestre", "col_program": "programma", "col_window": "finestra",
+        "box_windows": "finestre", "more": "… altri {n} processi",
+        "error": "Errore: {e}", "empty": "Nessuna finestra aperta.",
+        "too_small": "hyprtop: finestra troppo piccola",
+        "no_ws": "Nessuna finestra sul workspace {n}", "go": "Vai a {cls} su {ws}",
+        "close_q": "Chiudo la finestra «{title}» di {cls}?", "cancelled": "Annullato",
+        "win_gone": "La finestra non c'è più, non chiudo niente",
+        "close_sent": "Chiesta la chiusura di «{title}»",
+        "verb_term": "Termino", "verb_kill": "Uccido (SIGKILL)",
+        "note_shared": "ha finestre anche su altri workspace",
+        "note_here": "è il terminale di hyprtop", "warning": "Attenzione: {notes}. ",
+        "proc_missing": "{cls}: processo non trovato",
+        "signal_q": "{note}{verb} {cls} (pid {pid}, {n} processi)?",
+        "signal_gone": "{cls} (pid {pid}) non c'è più, non mando niente",
+        "signal_sent": "Mandato {sig} a {cls} (pid {pid})",
+        "yes_no": "[s/N]", "lang_set": "Lingua: italiano",
+        "hints": (("↑↓", "scegli"), ("⏎", "vai"), ("e", "processi"), ("c", "chiudi"),
+                  ("t", "termina"), ("K", "uccidi"), ("o", "ordine"), ("v", "vista"),
+                  ("z", "centra"), ("L", "english"), ("+-", "intervallo"),
+                  ("?", "aiuto"), ("q", "esci")),
+        "help": """\
+ hyprtop: programmi con finestra, per workspace
+
+ ↑ ↓  j k      scegli un programma
+ ← →  h l      scheda a sinistra / a destra (vista a schede)
+ PgSu PgGiù    una pagina (a schede: la fila sopra / sotto)
+ v             vista a schede o a lista
+ z             schede dell'ultima fila centrate o a sinistra
+ L             cambia lingua (inglese / italiano)
+ Tab  1-9      salta al workspace dopo / al workspace N
+ Invio         vai alla finestra (cambia workspace)
+ e  Spazio     mostra o nascondi i processi del programma
+ c             chiudi la finestra (come la X)
+ t             termina il programma (SIGTERM)
+ K             uccidi il programma (SIGKILL)
+ o             ordine: CPU, RAM, nome
+ + -           aggiorna più spesso / più di rado
+ r             aggiorna adesso
+ q  Esc        esci
+
+ CPU in % di tutta la macchina ({ncpu} core), sommata sui processi figli.
+ RAM = PSS sommata sui processi figli (la memoria condivisa è divisa tra chi
+ la usa), riletta ogni 10 s; nei primi secondi e per i processi nuovi è la RSS.
+ ◆ = il terminale dove gira hyprtop
+ ↔ = stesso processo con finestre su più workspace (nel totale contato una volta)
+ ×N = N finestre di quel programma sul workspace
+
+ Premi un tasto per tornare.""",
+    },
+}
+
+
+def t(key, **kw):
+    text = STRINGS[LANG_NOW][key]
+    return text.format(**kw) if kw else text
+
+
+def set_lang(lang):
+    global LANG_NOW
+    LANG_NOW = lang if lang in LANGS else "en"
+
+
+def detect_lang(state):
+    """La lingua salvata, altrimenti quella del sistema: italiano se è italiano,
+    inglese per tutto il resto."""
+    if state.get("lingua") in LANGS:
+        return state["lingua"]
+    env = os.environ.get("LC_ALL") or os.environ.get("LC_MESSAGES") or os.environ.get("LANG") or ""
+    return "it" if env.startswith("it") else "en"
+
+
+def win_count(n):
+    return t("win_1") if n == 1 else t("win_n", n=n)
 
 
 class HyprError(Exception):
@@ -43,7 +198,7 @@ def hyprctl_json(what, kind):
     except json.JSONDecodeError as e:
         raise HyprError(f"hyprctl {what}: {(r.stdout + r.stderr).strip()[:200]}") from e
     if not isinstance(data, kind):
-        raise HyprError(f"hyprctl {what}: risposta inattesa ({type(data).__name__})")
+        raise HyprError(f"hyprctl {what}: " + t("unexpected", kind=type(data).__name__))
     return data
 
 
@@ -348,7 +503,7 @@ def save_state(**changes):
             json.dump(data, f, indent=1)
         os.replace(tmp, path)
     except OSError as e:
-        return f"non riesco a salvare la scelta in {path}: {e.strerror}"
+        return t("save_failed", path=path, err=e.strerror)
     return None
 
 
@@ -408,45 +563,16 @@ class Model:
 def render_text(model, how="cpu"):
     lines = []
     for ws in model.spaces:
-        act = " (attivo)" if ws.active else ""
-        nw = f"{ws.nwin} finestr{'a' if ws.nwin == 1 else 'e'}"
+        act = f" ({t('active')})" if ws.active else ""
+        nw = win_count(ws.nwin)
         lines.append(f"{ws.label}{act}  {nw}  CPU {ws.cpu:.1f}%  RAM {fmt_mem(ws.mem)}")
         for a in sort_apps(ws.apps, how):
             mark = ("◆" if a.here else " ") + ("↔" if a.shared else " ")
             extra = f" ×{len(a.windows)}" if len(a.windows) > 1 else ""
             lines.append(f"  {mark}{fit(a.cls, 16)} {a.cpu:5.1f}% {fmt_mem(a.mem):>7} "
                          f"{len(a.procs):3}p  {a.main.title}{extra}")
-    lines.append(f"Totale finestre: CPU {model.tot_cpu:.1f}%  RAM {fmt_mem(model.tot_mem)}")
+    lines.append(t("total", cpu=model.tot_cpu, mem=fmt_mem(model.tot_mem)))
     return "\n".join(lines)
-
-
-HELP = """\
- hyprtop: programmi con finestra, per workspace
-
- ↑ ↓  j k      scegli un programma
- ← →  h l      scheda a sinistra / a destra (vista a schede)
- PgSu PgGiù    una pagina (a schede: la fila sopra / sotto)
- v             vista a schede o a lista
- z             schede dell'ultima fila centrate o a sinistra
- Tab  1-9      salta al workspace dopo / al workspace N
- Invio         vai alla finestra (cambia workspace)
- e  Spazio     mostra o nascondi i processi del programma
- c             chiudi la finestra (come la X)
- t             termina il programma (SIGTERM)
- K             uccidi il programma (SIGKILL)
- o             ordine: CPU, RAM, nome
- + -           aggiorna più spesso / più di rado
- r             aggiorna adesso
- q  Esc        esci
-
- CPU in % di tutta la macchina ({ncpu} core), sommata sui processi figli.
- RAM = PSS sommata sui processi figli (la memoria condivisa è divisa tra chi
- la usa), riletta ogni 10 s; nei primi secondi e per i processi nuovi è la RSS.
- ◆ = il terminale dove gira hyprtop
- ↔ = stesso processo con finestre su più workspace (nel totale contato una volta)
- ×N = N finestre di quel programma sul workspace
-
- Premi un tasto per tornare."""
 
 
 # --- colori, presi dal tema di btop ---------------------------------------
@@ -653,7 +779,7 @@ class UI:
                 if ws.wid == target:
                     self.sel = rows[i][1].key
                     return
-            self.say(f"Nessuna finestra sul workspace {target}")
+            self.say(t("no_ws", n=target))
             return
         names = [ws.name for ws, _ in firsts]
         nxt = firsts[(names.index(cur_ws) + 1) % len(firsts)][1]
@@ -761,10 +887,11 @@ class UI:
         clock = f" {time.strftime('%H:%M:%S')} "
         left_end, right_start = self.border(
             0, w, "╭", "╮", [[("hyprtop", p("title", bold=True))]],
-            [[("ogni ", p("inactive_fg")), (f"{self.interval:g}s", p("main_fg"))],
-             [("ordine ", p("inactive_fg")), (self.sort, p("main_fg"))],
-             [("vista ", p("inactive_fg")),
-              (self.view + (" centrate" if self.center and self.view == "schede" else ""), p("main_fg"))]],
+            [[(t("every"), p("inactive_fg")), (f"{self.interval:g}s", p("main_fg"))],
+             [(t("sort"), p("inactive_fg")), (t("sort_" + self.sort), p("main_fg"))],
+             [(t("view"), p("inactive_fg")),
+              (t("view_" + self.view) + (t("centered") if self.center and self.view == "schede" else ""),
+               p("main_fg"))]],
             "cpu_box")
         cx = (w - len(clock)) // 2
         if cx > left_end + 1 and cx + len(clock) < right_start - 1:
@@ -772,7 +899,7 @@ class UI:
         side = p("cpu_box")
         self.text(1, 0, "│", side)
         used = m.sys_mem_total - m.sys_mem_avail
-        tail = f"  finestre  cpu {m.tot_cpu:4.1f}%  mem {fmt_mem(m.tot_mem)}"
+        tail = f"  {t('top_windows')}  cpu {m.tot_cpu:4.1f}%  mem {fmt_mem(m.tot_mem)}"
         mem_txt = f" {fmt_mem(used)}/{fmt_mem(m.sys_mem_total)}"
         bars = max(4, (w - 4 - 4 - 5 - 4 - len(mem_txt) - len(tail) - 3) // 2)
         x = self.text(1, 2, "cpu ", p("hi_fg", bold=True))
@@ -791,8 +918,8 @@ class UI:
         p, c = self.pal, self.columns(w)
         edge, head = p("proc_box"), p("main_fg", bold=True)
         self.text(y, 0, "│", edge)
-        self.text(y, c["cls"], "programma", head)
-        self.text(y, c["title"], fit("finestra", c["title_w"]).rstrip(), head)
+        self.text(y, c["cls"], t("col_program"), head)
+        self.text(y, c["title"], fit(t("col_window"), c["title_w"]).rstrip(), head)
         self.text(y, c["cpubar"] if c["bar"] else c["cpu"] + 2, "cpu", head)
         if c["bar"]:
             self.text(y, c["membar"], "mem", head)
@@ -805,10 +932,10 @@ class UI:
         p, c, m = self.pal, self.columns(w), self.model
         edge = p("proc_box")
         if kind == "ws":
-            n = f"{ws.nwin} finestr{'a' if ws.nwin == 1 else 'e'}"
+            n = win_count(ws.nwin)
             left = [[(ws.label, p("hi_fg" if ws.active else "title", bold=True))]]
             if ws.active:
-                left.append([("● attivo", p("hi_fg", bold=True))])
+                left.append([("● " + t("active"), p("hi_fg", bold=True))])
             right = [[(n, p("inactive_fg"))], [(f"{ws.cpu:.1f}%", p("main_fg"))],
                      [(fmt_mem(ws.mem), p("main_fg"))]]
             self.border(y, w, "├", "┤", left, right, "hi_fg" if ws.active else "div_line")
@@ -835,7 +962,7 @@ class UI:
             self.text(y, c["mem"], f"{fmt_mem(obj.mem):>7}", p("main_fg", bg))
             self.text(y, c["proc"], f"{len(obj.procs):4}", p("inactive_fg", bg))
         elif kind == "more":
-            self.text(y, c["title"], f"… altri {obj} processi", p("inactive_fg"))
+            self.text(y, c["title"], t("more", n=obj), p("inactive_fg"))
         else:
             pid, name, cpu, mem = obj
             x = self.text(y, c["cls"] + 2, "└ ", p("div_line"))
@@ -844,10 +971,6 @@ class UI:
             self.text(y, c["mem"], f"{fmt_mem(mem):>7}", p("inactive_fg"))
         self.text(y, w - 1, "│", edge)
 
-    HINTS = (("↑↓", "scegli"), ("⏎", "vai"), ("e", "processi"), ("c", "chiudi"),
-             ("t", "termina"), ("K", "uccidi"), ("o", "ordine"), ("v", "vista"), ("z", "centra"),
-             ("+-", "intervallo"), ("?", "aiuto"), ("q", "esci"))
-
     def draw_hints(self, y, w):
         """Riga sotto il riquadro: un messaggio, un errore, o i tasti separati da ·."""
         p, m = self.pal, self.model
@@ -855,11 +978,11 @@ class UI:
             self.text(y, 1, fit(self.msg, w - 2).rstrip(), p("main_fg", bold=True))
             return
         if m.error:
-            self.text(y, 1, fit(f"Errore: {m.error}", w - 2).rstrip(), p("temp_end", bold=True))
+            self.text(y, 1, fit(t("error", e=m.error), w - 2).rstrip(), p("temp_end", bold=True))
             return
-        hints = list(self.HINTS)
+        hints = list(t("hints"))
         if self.view == "schede":
-            hints[0] = ("↑↓←→", "scegli")
+            hints[0] = ("↑↓←→", hints[0][1])
         else:
             hints = [hk for hk in hints if hk[0] != "z"]  # nella lista non serve
         need = lambda h: sum(cwidth(ch) for ch in h[0]) + 1 + len(h[1])
@@ -880,7 +1003,7 @@ class UI:
 
     def draw_help(self, h, w):
         p = self.pal
-        lines = HELP.format(ncpu=NCPU).splitlines()
+        lines = t("help", ncpu=NCPU).splitlines()
         bw = min(w, max(sum(cwidth(c) for c in l) for l in lines) + 4)
         bh = min(h, len(lines) + 2)
         if bh - 2 < len(lines):
@@ -1039,7 +1162,7 @@ class UI:
             ws = card.ws
             left = [[(ws.label, p("hi_fg" if ws.active else "title", bold=True))]]
             if ws.active:
-                left.append([("● attivo", p("hi_fg", bold=True))])
+                left.append([("● " + t("active"), p("hi_fg", bold=True))])
             right = [[(f"{ws.cpu:.1f}%", p("main_fg"))], [(fmt_mem(ws.mem), p("main_fg"))]]
             self.border(y, w, "╭", "╮", left, right, color, x0=x0)
             return
@@ -1075,7 +1198,7 @@ class UI:
             self.text(y, c["title"], fit(title, c["title_w"]).rstrip(),
                       p("main_fg" if sel else "inactive_fg", bg))
         elif kind == "more":
-            self.text(y, c["title"] + 2, f"… altri {obj} processi", p("inactive_fg"))
+            self.text(y, c["title"] + 2, t("more", n=obj), p("inactive_fg"))
         else:
             pid, name, cpu, mem = obj
             x = self.text(y, c["title"], "└ ", p("div_line"))
@@ -1117,7 +1240,7 @@ class UI:
                     self.draw_card_line(y, card, li, heights[card.row])
         if not cards:
             if not self.model.error:
-                self.text(body_y, 2, "Nessuna finestra aperta.", p("inactive_fg"))
+                self.text(body_y, 2, t("empty"), p("inactive_fg"))
             total = 1
         return body_y + min(body, total - self.ctop)
 
@@ -1125,7 +1248,7 @@ class UI:
         self.scr.erase()
         h, w = self.scr.getmaxyx()
         if w < 48 or h < 9:  # sotto le 48 colonne la riga programma non ci sta
-            self.put(0, 0, "hyprtop: finestra troppo piccola")
+            self.put(0, 0, t("too_small"))
             self.hint_y = None
             self.scr.refresh()
             return
@@ -1142,9 +1265,9 @@ class UI:
             return
         nws = len(m.spaces)
         nwin = sum(ws.nwin for ws in m.spaces)
-        self.border(3, w, "╭", "╮", [[("finestre", p("title", bold=True))]],
+        self.border(3, w, "╭", "╮", [[(t("box_windows"), p("title", bold=True))]],
                     [[(f"{nws} workspace", p("inactive_fg"))],
-                     [(f"{nwin} finestr{'a' if nwin == 1 else 'e'}", p("inactive_fg"))]],
+                     [(win_count(nwin), p("inactive_fg"))]],
                     "proc_box")
         self.draw_header(4, w)
 
@@ -1169,7 +1292,7 @@ class UI:
             # Il riquadro finisce dopo l'ultima riga: vuoto, ne tiene una per il messaggio.
             self.text(end, 0, "│", p("proc_box"))
             if not m.error:
-                self.text(end, 3, "Nessuna finestra aperta.", p("inactive_fg"))
+                self.text(end, 3, t("empty"), p("inactive_fg"))
             self.text(end, w - 1, "│", p("proc_box"))
             end += 1
         self.border(end, w, "╰", "╯", [], [], "proc_box")
@@ -1185,7 +1308,7 @@ class UI:
     def confirm(self, question):
         if self.hint_y is None:
             return False  # la domanda non si vedrebbe
-        self.put(self.hint_y, 0, f" {question} [s/N] ", self.c_warn)
+        self.put(self.hint_y, 0, f" {question} {t('yes_no')} ", self.c_warn)
         self.scr.refresh()
         curses.flushinp()
         self.scr.timeout(-1)
@@ -1200,12 +1323,12 @@ class UI:
 
     def act_go(self, app):
         ok, msg = dispatch("focuswindow", f"address:{app.main.address}")
-        self.say(f"Vai a {app.cls} su {app.ws}" if ok else f"hyprctl: {msg}")
+        self.say(t("go", cls=app.cls, ws=app.ws) if ok else f"hyprctl: {msg}")
 
     def act_close(self, app):
         win = app.main
-        if not self.confirm(f"Chiudo la finestra «{win.title[:40]}» di {app.cls}?"):
-            self.say("Annullato")
+        if not self.confirm(t("close_q", title=win.title[:40], cls=app.cls)):
+            self.say(t("cancelled"))
             return
         try:
             now = hyprctl_json("clients", list)
@@ -1213,25 +1336,25 @@ class UI:
             self.say(str(e))
             return
         if not any(c.get("address") == win.address and c.get("pid") == app.pid for c in now):
-            self.say("La finestra non c'è più, non chiudo niente")
+            self.say(t("win_gone"))
             return
         ok, msg = dispatch("closewindow", f"address:{win.address}")
-        self.say(f"Chiesta la chiusura di «{win.title[:40]}»" if ok else f"hyprctl: {msg}")
+        self.say(t("close_sent", title=win.title[:40]) if ok else f"hyprctl: {msg}")
         self.next_refresh = time.monotonic() + 0.5
 
     def act_signal(self, app, sig):
-        name = "Termino" if sig == signal.SIGTERM else "Uccido (SIGKILL)"
+        verb = t("verb_term") if sig == signal.SIGTERM else t("verb_kill")
         notes = []
         if app.shared:
-            notes.append("ha finestre anche su altri workspace")
+            notes.append(t("note_shared"))
         if app.here:
-            notes.append("è il terminale di hyprtop")
-        note = f"Attenzione: {', '.join(notes)}. " if notes else ""
+            notes.append(t("note_here"))
+        note = t("warning", notes=", ".join(notes)) if notes else ""
         if app.proc is None:
-            self.say(f"{app.cls}: processo non trovato")
+            self.say(t("proc_missing", cls=app.cls))
             return
-        if not self.confirm(f"{note}{name} {app.cls} (pid {app.pid}, {len(app.procs)} processi)?"):
-            self.say("Annullato")
+        if not self.confirm(t("signal_q", note=note, verb=verb, cls=app.cls, pid=app.pid, n=len(app.procs))):
+            self.say(t("cancelled"))
             return
         try:
             # is_running confronta anche l'ora di avvio: se il pid ora è di un altro
@@ -1240,12 +1363,12 @@ class UI:
                 raise psutil.NoSuchProcess(app.pid)
             app.proc.send_signal(sig)
         except psutil.NoSuchProcess:
-            self.say(f"{app.cls} (pid {app.pid}) non c'è più, non mando niente")
+            self.say(t("signal_gone", cls=app.cls, pid=app.pid))
             return
         except psutil.Error as e:
             self.say(f"{app.cls}: {e}")
             return
-        self.say(f"Mandato {signal.Signals(sig).name} a {app.cls} (pid {app.pid})")
+        self.say(t("signal_sent", sig=signal.Signals(sig).name, cls=app.cls, pid=app.pid))
         self.next_refresh = time.monotonic() + 0.5
 
     def handle(self, ch):
@@ -1291,6 +1414,10 @@ class UI:
                 self.move(max(1, self.scr.getmaxyx()[0] - 4))
         elif ch == ord("v"):
             self.view = "lista" if cards else "schede"
+        elif ch == ord("L"):
+            set_lang("it" if LANG_NOW == "en" else "en")
+            err = save_state(lingua=LANG_NOW)
+            self.say(err or t("lang_set"))
         elif ch == ord("z"):
             self.center = not self.center
             err = save_state(centra=self.center)
@@ -1349,14 +1476,16 @@ class UI:
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Programmi con finestra, raggruppati per workspace di Hyprland.")
-    ap.add_argument("-i", "--intervallo", type=float, default=2.0, metavar="SECONDI",
-                    help="ogni quanto aggiornare (default 2)")
-    ap.add_argument("--once", action="store_true", help="stampa una volta ed esce")
+    set_lang(detect_lang(load_state()))
+    ap = argparse.ArgumentParser(description=t("description"))
+    # --intervallo resta per chi lo usava nella 0.1.0
+    ap.add_argument("-i", "--interval", "--intervallo", dest="interval", type=float, default=2.0,
+                    metavar=t("metavar_seconds"), help=t("help_interval"))
+    ap.add_argument("--once", action="store_true", help=t("help_once"))
     ap.add_argument("--version", action="version", version=f"hyprtop {__version__}")
     args = ap.parse_args()
     if not os.environ.get("HYPRLAND_INSTANCE_SIGNATURE"):
-        sys.exit("hyprtop: HYPRLAND_INSTANCE_SIGNATURE non c'è, va lanciato dentro Hyprland")
+        sys.exit(t("no_hyprland"))
     model = Model(background_pss=not args.once)
     model.refresh()
     time.sleep(0.5)  # cpu_percent misura dalla chiamata prima: al primo giro darebbe zero
@@ -1367,7 +1496,7 @@ def main():
         print(render_text(model))
         return
     os.environ.setdefault("ESCDELAY", "25")
-    interval = max(0.5, min(30.0, args.intervallo))
+    interval = max(0.5, min(30.0, args.interval))
     try:
         curses.wrapper(lambda scr: UI(scr, model, interval).run())
     except KeyboardInterrupt:

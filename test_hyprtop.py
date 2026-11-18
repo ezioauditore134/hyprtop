@@ -1,3 +1,4 @@
+import json
 import os
 import pty
 import select
@@ -357,7 +358,7 @@ class StateTest(unittest.TestCase):
     def test_unwritable(self):
         with open(os.path.join(self.dir.name, "hyprtop"), "w") as f:
             f.write("un file al posto della cartella")
-        self.assertIn("non riesco", ht.save_state(centra=True))
+        self.assertIn("cannot save", ht.save_state(centra=True))
 
 
 class HyprctlTest(unittest.TestCase):
@@ -382,23 +383,83 @@ class HyprctlTest(unittest.TestCase):
         self.fake_run("null")
         m.refresh()
         self.assertEqual(m.spaces, ["vecchio"])
+        self.assertIn("unexpected reply", m.error)
+        ht.set_lang("it")
+        self.addCleanup(ht.set_lang, "en")
+        m.refresh()
         self.assertIn("risposta inattesa", m.error)
+
+
+class LangTest(unittest.TestCase):
+    def setUp(self):
+        self.env = {k: os.environ.get(k) for k in ("LC_ALL", "LC_MESSAGES", "LANG")}
+        for k in self.env:
+            os.environ.pop(k, None)
+        self.addCleanup(self.restore)
+
+    def restore(self):
+        for k, v in self.env.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+        ht.set_lang("en")
+
+    def test_detect(self):
+        self.assertEqual(ht.detect_lang({}), "en")
+        os.environ["LANG"] = "it_IT.UTF-8"
+        self.assertEqual(ht.detect_lang({}), "it")
+        os.environ["LC_ALL"] = "en_GB.UTF-8"                   # LC_ALL vince su LANG
+        self.assertEqual(ht.detect_lang({}), "en")
+        self.assertEqual(ht.detect_lang({"lingua": "it"}), "it")  # la scelta salvata vince
+        self.assertEqual(ht.detect_lang({"lingua": "fr"}), "en")  # valore sconosciuto: ignorato
+
+    def test_same_keys(self):
+        en, it = ht.STRINGS["en"], ht.STRINGS["it"]
+        self.assertEqual(set(en), set(it))
+        self.assertEqual([k for k, _ in en["hints"]], [k for k, _ in it["hints"]])
+        for lang in ht.LANGS:
+            ht.set_lang(lang)
+            self.assertIn("4", ht.t("help", ncpu=4))
+            self.assertEqual(ht.win_count(1).split()[0], "1")
+        ht.set_lang("de")
+        self.assertEqual(ht.LANG_NOW, "en")
 
 
 @unittest.skipUnless(os.environ.get("HYPRLAND_INSTANCE_SIGNATURE"), "serve Hyprland")
 class LiveTest(unittest.TestCase):
+    WORDS = {"it": ("Totale finestre", "programma", "Premi un tasto"),
+             "en": ("Window total", "program", "Press any key")}
+
+    def env(self, lang):
+        import tempfile
+        state = tempfile.TemporaryDirectory()  # mai il file di stato vero
+        self.addCleanup(state.cleanup)
+        env = dict(os.environ, LANG="it_IT.UTF-8" if lang == "it" else "en_US.UTF-8",
+                   XDG_STATE_HOME=state.name, TERM="xterm-256color")
+        env.pop("LC_ALL", None)
+        env.pop("LC_MESSAGES", None)
+        return env, state.name
+
     def test_once(self):
-        r = subprocess.run([sys.executable, os.path.join(HERE, "hyprtop.py"), "--once"],
-                           capture_output=True, text=True, timeout=20)
-        self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertIn("Totale finestre", r.stdout)
+        for lang, (total, _, _) in self.WORDS.items():
+            env, _ = self.env(lang)
+            r = subprocess.run([sys.executable, os.path.join(HERE, "hyprtop.py"), "--once"],
+                               capture_output=True, text=True, timeout=20, env=env)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertIn(total, r.stdout)
 
     def test_tui_keys(self):
+        for lang in self.WORDS:
+            with self.subTest(lang=lang):
+                self.tui(lang)
+
+    def tui(self, lang):
         # Solo tasti che non toccano finestre o processi.
+        env, state = self.env(lang)
         pid, fd = pty.fork()
         if pid == 0:
-            os.environ["TERM"] = "xterm-256color"
-            os.execv(sys.executable, [sys.executable, os.path.join(HERE, "hyprtop.py"), "-i", "0.5"])
+            os.execve(sys.executable, [sys.executable, os.path.join(HERE, "hyprtop.py"), "-i", "0.5"], env)
         fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", 30, 120, 0, 0))
         out = b""
 
@@ -426,6 +487,8 @@ class LiveTest(unittest.TestCase):
             os.write(fd, b"\x1bj")  # Alt+j: non deve uscire
             pump(0.6)
             self.assertEqual(os.waitpid(pid, os.WNOHANG), (0, 0))
+            os.write(fd, b"L")  # cambia lingua e la salva
+            pump(0.6)
             os.write(fd, b"q")
             pump(1.0)
             _, status = os.waitpid(pid, 0)
@@ -437,10 +500,13 @@ class LiveTest(unittest.TestCase):
             os.close(fd)
         self.assertEqual(os.waitstatus_to_exitcode(status), 0, out[-2000:])
         text = out.decode("utf-8", "replace")
-        self.assertIn("programma", text)
-        self.assertIn("finestre", text)
-        self.assertIn("Premi un tasto", text)
+        _, column, help_end = self.WORDS[lang]
+        self.assertIn(column, text)
+        self.assertIn(help_end, text)
         self.assertNotIn("Traceback", text)
+        with open(os.path.join(state, "hyprtop", "stato.json")) as f:
+            saved = json.load(f)
+        self.assertEqual(saved.get("lingua"), "en" if lang == "it" else "it")
 
 
 if __name__ == "__main__":

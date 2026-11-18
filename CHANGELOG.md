@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.2.0 (2026-11-18)
+
+- The interface is in English and Italian. It starts in the system language (`LC_ALL`, `LC_MESSAGES` or `LANG`; Italian if it starts with `it`, English otherwise), and `L` switches between the two. The choice is saved with the other settings.
+- `--interval` replaces `--intervallo`, which still works.
+- Pushing a `v*` tag creates the GitHub release, with the notes taken from this file.
+
 ## v0.1.0 (2026-11-18)
 
 First release.
