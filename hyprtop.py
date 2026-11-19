@@ -10,6 +10,7 @@ import argparse
 import colorsys
 import curses
 import json
+import math
 import re
 import os
 import signal
@@ -22,7 +23,7 @@ from dataclasses import dataclass, field
 
 import psutil
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 NCPU = psutil.cpu_count() or 1
 SORTS = ("cpu", "ram", "nome")
@@ -39,6 +40,7 @@ STRINGS = {
         "description": "Programs with a window, grouped by Hyprland workspace.",
         "help_interval": "refresh interval in seconds (default 2)",
         "help_once": "print one snapshot and exit",
+        "help_demo": "made-up windows and processes, no Hyprland needed (for trying it out and screenshots)",
         "metavar_seconds": "SECONDS",
         "no_hyprland": "hyprtop: HYPRLAND_INSTANCE_SIGNATURE is not set, run it inside Hyprland",
         "unexpected": "unexpected reply ({kind})",
@@ -62,6 +64,7 @@ STRINGS = {
         "signal_q": "{note}{verb} {cls} (pid {pid}, {n} processes)?",
         "signal_gone": "{cls} (pid {pid}) is gone, no signal sent",
         "signal_sent": "Sent {sig} to {cls} (pid {pid})",
+        "demo_noop": "Demo mode: this key does nothing",
         "yes_no": "[y/N]", "lang_set": "Language: English",
         "hints": (("↑↓", "select"), ("⏎", "go"), ("e", "processes"), ("c", "close"),
                   ("t", "terminate"), ("K", "kill"), ("o", "sort"), ("v", "view"),
@@ -100,6 +103,7 @@ STRINGS = {
         "description": "Programmi con finestra, raggruppati per workspace di Hyprland.",
         "help_interval": "ogni quanti secondi aggiornare (default 2)",
         "help_once": "stampa una volta ed esce",
+        "help_demo": "finestre e processi inventati, senza Hyprland (per provarlo e per le catture)",
         "metavar_seconds": "SECONDI",
         "no_hyprland": "hyprtop: HYPRLAND_INSTANCE_SIGNATURE non c'è, va lanciato dentro Hyprland",
         "unexpected": "risposta inattesa ({kind})",
@@ -124,6 +128,7 @@ STRINGS = {
         "signal_q": "{note}{verb} {cls} (pid {pid}, {n} processi)?",
         "signal_gone": "{cls} (pid {pid}) non c'è più, non mando niente",
         "signal_sent": "Mandato {sig} a {cls} (pid {pid})",
+        "demo_noop": "Modalità demo: questo tasto non fa niente",
         "yes_no": "[s/N]", "lang_set": "Lingua: italiano",
         "hints": (("↑↓", "scegli"), ("⏎", "vai"), ("e", "processi"), ("c", "chiudi"),
                   ("t", "termina"), ("K", "uccidi"), ("o", "ordine"), ("v", "vista"),
@@ -513,6 +518,8 @@ def own_ancestors():
 
 
 class Model:
+    demo = False
+
     def __init__(self, background_pss=True):
         self.sampler = Sampler()
         self.reader = PssReader() if background_pss else None
@@ -556,6 +563,83 @@ class Model:
                 if a.key == key:
                     return a
         return None
+
+
+# --- modalità demo (--demo) ----------------------------------------------
+
+# (workspace id, nome, pid, classe, titoli delle finestre, processi: nome, CPU %, MiB)
+DEMO_APPS = [
+    (1, "1", 1201, "firefox", ["Hyprland Wiki — Mozilla Firefox", "Release notes — Mozilla Firefox"],
+     [("firefox", 3.1, 610), ("Isolated Web Co", 2.4, 380), ("Isolated Web Co", 1.2, 290),
+      ("WebExtensions", 0.4, 160), ("RDD Process", 0.3, 90), ("Socket Process", 0.1, 40)]),
+    (1, "1", 1388, "kitty", ["~/projects/hyprtop"],
+     [("kitty", 0.6, 120), ("bash", 0.0, 6), ("nvim", 0.4, 48)]),
+    (2, "2", 2140, "kitty", ["cargo build --release"],
+     [("kitty", 0.8, 115), ("zsh", 0.0, 7), ("cargo", 1.5, 140), ("rustc", 24.0, 820),
+      ("rustc", 18.5, 640), ("rustc", 11.0, 410)]),
+    (3, "3", 3051, "codium", ["main.py — demo-app — VSCodium"],
+     [("codium", 1.2, 260), ("codium", 2.6, 410), ("codium", 0.9, 180), ("pyright", 3.4, 300),
+      ("bash", 0.0, 5)]),
+    (3, "3", 1201, "firefox", ["Pull requests · demo/demo-app — Mozilla Firefox"], []),
+    (4, "4", 4410, "mpv", ["big_buck_bunny_1080p.mp4 - mpv"], [("mpv", 6.8, 230)]),
+    (5, "5", 5120, "thunar", ["Downloads - Thunar"], [("thunar", 0.1, 70)]),
+    (5, "5", 5233, "gimp", ["[sunset] (imported)-1.0 (RGB color 8-bit gamma integer, GIMP built-in sRGB, 1 layer) 1920x1080 – GIMP"],
+     [("gimp", 0.7, 520), ("script-fu", 0.0, 30)]),
+    (6, "6", 6007, "thunderbird", ["Inbox - Mozilla Thunderbird"],
+     [("thunderbird", 0.5, 430), ("Isolated Web Co", 0.2, 120)]),
+    (-98, "special:scratch", 9810, "kitty", ["btop"],
+     [("kitty", 0.3, 105), ("bash", 0.0, 6), ("btop", 1.1, 14)]),
+]
+
+
+class DemoModel(Model):
+    """Model con finestre e processi inventati: passa da group() come i dati veri,
+    ma non chiama hyprctl e non legge /proc. CPU e RAM oscillano un poco a ogni giro.
+    Le scelte fatte nella demo (lingua, centratura) non si salvano."""
+
+    demo = True
+
+    def __init__(self):
+        self.own = frozenset()
+        self.spaces = []
+        self.error = None
+        self.tot_cpu = 0.0
+        self.tot_mem = 0
+        self.sys_cpu = 0.0
+        self.sys_mem_total = 16 << 30
+        self.sys_mem_avail = 0
+        self.tick = 0
+
+    def refresh(self):
+        self.tick += 1
+        clients, procs, addr = [], {}, 0
+        for wid, name, pid, cls, titles, rows in DEMO_APPS:
+            for title in titles:
+                addr += 1
+                clients.append({"pid": pid, "workspace": {"id": wid, "name": name},
+                                "class": cls, "title": title, "mapped": True,
+                                "address": f"0xdemo{addr}", "focusHistoryID": addr})
+            if rows:
+                procs[pid] = rows
+        self.spaces = group(clients, active_id=1)
+        by_pid = {}
+        for ws in self.spaces:
+            for app in ws.apps:
+                if app.pid not in by_pid:
+                    out = []
+                    for i, (pname, cpu, mib) in enumerate(procs.get(app.pid, [])):
+                        wave = 1 + 0.25 * math.sin(self.tick * 0.7 + app.pid + i)
+                        out.append((app.pid * 10 + i, pname, cpu * wave, int(mib * (1 + 0.02 * wave)) << 20))
+                    out.sort(key=lambda r: r[2], reverse=True)
+                    by_pid[app.pid] = out
+                app.proc = None
+                app.procs = by_pid[app.pid]
+                app.cpu = sum(r[2] for r in app.procs)
+                app.mem = sum(r[3] for r in app.procs)
+        self.tot_cpu = sum(r[2] for rows in by_pid.values() for r in rows)
+        self.tot_mem = sum(r[3] for rows in by_pid.values() for r in rows)
+        self.sys_cpu = min(100.0, self.tot_cpu + 4.0)
+        self.sys_mem_avail = self.sys_mem_total - self.tot_mem - (3 << 30)
 
 
 # --- stampa semplice (--once) --------------------------------------------
@@ -1322,10 +1406,16 @@ class UI:
         return self.model.find(self.sel) if self.sel else None
 
     def act_go(self, app):
+        if self.model.demo:
+            self.say(t("demo_noop"))
+            return
         ok, msg = dispatch("focuswindow", f"address:{app.main.address}")
         self.say(t("go", cls=app.cls, ws=app.ws) if ok else f"hyprctl: {msg}")
 
     def act_close(self, app):
+        if self.model.demo:
+            self.say(t("demo_noop"))
+            return
         win = app.main
         if not self.confirm(t("close_q", title=win.title[:40], cls=app.cls)):
             self.say(t("cancelled"))
@@ -1343,6 +1433,9 @@ class UI:
         self.next_refresh = time.monotonic() + 0.5
 
     def act_signal(self, app, sig):
+        if self.model.demo:
+            self.say(t("demo_noop"))
+            return
         verb = t("verb_term") if sig == signal.SIGTERM else t("verb_kill")
         notes = []
         if app.shared:
@@ -1416,11 +1509,11 @@ class UI:
             self.view = "lista" if cards else "schede"
         elif ch == ord("L"):
             set_lang("it" if LANG_NOW == "en" else "en")
-            err = save_state(lingua=LANG_NOW)
+            err = None if self.model.demo else save_state(lingua=LANG_NOW)
             self.say(err or t("lang_set"))
         elif ch == ord("z"):
             self.center = not self.center
-            err = save_state(centra=self.center)
+            err = None if self.model.demo else save_state(centra=self.center)
             if err:
                 self.say(err)
         elif ch == curses.KEY_HOME:
@@ -1482,14 +1575,19 @@ def main():
     ap.add_argument("-i", "--interval", "--intervallo", dest="interval", type=float, default=2.0,
                     metavar=t("metavar_seconds"), help=t("help_interval"))
     ap.add_argument("--once", action="store_true", help=t("help_once"))
+    ap.add_argument("--demo", action="store_true", help=t("help_demo"))
     ap.add_argument("--version", action="version", version=f"hyprtop {__version__}")
     args = ap.parse_args()
-    if not os.environ.get("HYPRLAND_INSTANCE_SIGNATURE"):
-        sys.exit(t("no_hyprland"))
-    model = Model(background_pss=not args.once)
-    model.refresh()
-    time.sleep(0.5)  # cpu_percent misura dalla chiamata prima: al primo giro darebbe zero
-    model.refresh()
+    if args.demo:
+        model = DemoModel()
+        model.refresh()
+    else:
+        if not os.environ.get("HYPRLAND_INSTANCE_SIGNATURE"):
+            sys.exit(t("no_hyprland"))
+        model = Model(background_pss=not args.once)
+        model.refresh()
+        time.sleep(0.5)  # cpu_percent misura dalla chiamata prima: al primo giro darebbe zero
+        model.refresh()
     if model.error:
         sys.exit(f"hyprtop: {model.error}")
     if args.once:

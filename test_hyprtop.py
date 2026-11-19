@@ -426,6 +426,86 @@ class LangTest(unittest.TestCase):
         self.assertEqual(ht.LANG_NOW, "en")
 
 
+class DemoTest(unittest.TestCase):
+    def test_model_touches_nothing_real(self):
+        def boom(*a, **k):
+            raise AssertionError("la demo non deve leggere il sistema")
+        saved = (ht.subprocess.run, ht.psutil.process_iter, ht.psutil.Process)
+        ht.subprocess.run = ht.psutil.process_iter = ht.psutil.Process = boom
+        try:
+            model = ht.DemoModel()
+            model.refresh()
+            model.refresh()
+        finally:
+            ht.subprocess.run, ht.psutil.process_iter, ht.psutil.Process = saved
+        names = [ws.name for ws in model.spaces]
+        self.assertEqual(names[0], "1")
+        self.assertEqual(names[-1], "special:scratch")
+        self.assertTrue(model.spaces[0].active)
+        shared = [a for ws in model.spaces for a in ws.apps if a.shared]
+        self.assertEqual({a.ws for a in shared}, {"1", "3"})
+        # Il firefox su due workspace conta una volta sola nel totale.
+        per_pid = {a.pid: a.mem for ws in model.spaces for a in ws.apps}
+        self.assertEqual(model.tot_mem, sum(per_pid.values()))
+        self.assertTrue(0 < model.sys_mem_avail < model.sys_mem_total)
+
+    def test_actions_blocked(self):
+        model = ht.DemoModel()
+        model.refresh()
+        ui = ht.UI.__new__(ht.UI)
+        ui.model = model
+        said = []
+        ui.say = said.append
+        ui.confirm = lambda q: self.fail("la demo non deve chiedere conferme")
+        saved = ht.dispatch
+        ht.dispatch = lambda *a: self.fail("la demo non deve chiamare hyprctl")
+        try:
+            app = model.spaces[0].apps[0]
+            ui.act_go(app)
+            ui.act_close(app)
+            ui.act_signal(app, signal.SIGTERM)
+            ui.act_signal(app, signal.SIGKILL)
+        finally:
+            ht.dispatch = saved
+        self.assertEqual(said, [ht.t("demo_noop")] * 4)
+        # La guardia vale solo per la demo: il Model vero deve poter agire.
+        self.assertFalse(ht.Model.demo)
+        self.assertTrue(ht.DemoModel.demo)
+
+    def test_choices_not_saved(self):
+        import tempfile
+        state = tempfile.TemporaryDirectory()
+        self.addCleanup(state.cleanup)
+        saved_env, saved_lang = os.environ.get("XDG_STATE_HOME"), ht.LANG_NOW
+        os.environ["XDG_STATE_HOME"] = state.name
+        try:
+            model = ht.DemoModel()
+            model.refresh()
+            ui = ht.UI.__new__(ht.UI)
+            ui.model, ui.center, ui.view = model, False, "schede"
+            ui.show_help = False
+            ui.say = lambda msg: None
+            ui.handle(ord("L"))
+            ui.handle(ord("z"))
+            self.assertFalse(os.path.exists(ht.state_path()))
+        finally:
+            ht.set_lang(saved_lang)
+            if saved_env is None:
+                os.environ.pop("XDG_STATE_HOME", None)
+            else:
+                os.environ["XDG_STATE_HOME"] = saved_env
+
+    def test_once_without_hyprland(self):
+        env = dict(os.environ, LANG="en_US.UTF-8")
+        env.pop("HYPRLAND_INSTANCE_SIGNATURE", None)
+        env.pop("LC_ALL", None)
+        r = subprocess.run([sys.executable, os.path.join(HERE, "hyprtop.py"), "--demo", "--once"],
+                           capture_output=True, text=True, timeout=20, env=env)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("cargo build --release", r.stdout)
+        self.assertIn("special:scratch", r.stdout)
+
+
 @unittest.skipUnless(os.environ.get("HYPRLAND_INSTANCE_SIGNATURE"), "serve Hyprland")
 class LiveTest(unittest.TestCase):
     WORDS = {"it": ("Totale finestre", "programma", "Premi un tasto"),

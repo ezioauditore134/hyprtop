@@ -2,13 +2,15 @@
 
 A terminal process viewer for [Hyprland](https://hyprland.org) that shows only the programs that have a window, grouped by workspace. Use it for a quick look at what is open on each workspace and how much CPU and memory it takes; for everything else, btop or htop are still the tools to use.
 
+![hyprtop in the card view, with made-up windows from --demo](docs/cards.png)
+
 Each program's CPU and memory are summed over its whole process tree, so a terminal window also counts the shell and whatever runs inside it, and a browser counts all of its content processes.
 
 The interface is in English and Italian. It starts in the system language (Italian when `LC_ALL`, `LC_MESSAGES` or `LANG` starts with `it`, English otherwise), and `L` switches between the two.
 
 ## Requirements
 
-- Hyprland (hyprtop talks to it through `hyprctl`)
+- Hyprland (hyprtop talks to it through `hyprctl`), except for `--demo`
 - Python 3.9 or newer
 - [psutil](https://github.com/giampaolo/psutil) 5.9 or newer
 
@@ -28,15 +30,18 @@ hyprtop is a single file with no other dependencies, so copying `hyprtop.py` any
 hyprtop            # interactive, refreshes every 2 s
 hyprtop -i 5       # refresh every 5 s (same as --interval 5)
 hyprtop --once     # print one snapshot as plain text and exit
+hyprtop --demo     # made-up windows and processes, to try it without Hyprland
 ```
 
-It must run inside a Hyprland session (it needs `HYPRLAND_INSTANCE_SIGNATURE`).
+It must run inside a Hyprland session (it needs `HYPRLAND_INSTANCE_SIGNATURE`), unless you pass `--demo`. In the demo the keys that act on windows or processes do nothing. The screenshots in this README come from the demo.
 
 ## Views
 
 The default view shows one card per workspace, laid out in rows of 1 to 4 columns depending on the terminal width. Each program takes two lines: its name with CPU and memory bars, then the title of its window. When the cards fit on screen, the rows stretch to fill the terminal height, and each card uses the extra lines to list the heaviest child processes of its programs. A bigger terminal shows more of them. If the cards don't fit, they scroll.
 
 Press `v` to switch to the list view: one box with a line per program and a separator line per workspace.
+
+![hyprtop in the list view, with the processes of one program expanded](docs/list.png)
 
 ## Keys
 

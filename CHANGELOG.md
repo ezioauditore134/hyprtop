@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.3.0 (2026-11-19)
+
+- `--demo` shows made-up windows and processes and runs without Hyprland, to try hyprtop or take screenshots. The keys that focus or close windows and send signals do nothing in the demo, and the language and centering chosen there are not saved.
+- Screenshots in the README.
+
 ## v0.2.0 (2026-11-18)
 
 - The interface is in English and Italian. It starts in the system language (`LC_ALL`, `LC_MESSAGES` or `LANG`; Italian if it starts with `it`, English otherwise), and `L` switches between the two. The choice is saved with the other settings.
